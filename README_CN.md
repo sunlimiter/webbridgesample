@@ -44,7 +44,7 @@ app/src/main/
 │       ├── BridgeRequest.kt     # JS→Native 请求 / Native→JS 响应的数据类
 │       ├── ActionHandler.kt     # 所有 Handler 必须实现的接口
 │       ├── ActionDispatcher.kt  # 注册表：将 action 字符串映射到对应 Handler
-│       ├── KiteJSJsInterface.kt # @JavascriptInterface 入口，协程调度
+│       ├── KiteJSInterface.kt # @JavascriptInterface 入口，协程调度
 │       └── GetLocationHandler.kt # 示例 Handler：getLocation 动作
 ```
 
@@ -69,7 +69,7 @@ app/src/main/
 
 ### Android → JS 回调
 
-原生侧通过 `window.KiteJS.onSuccess(callId, response)` 或 `window.KiteJS.onFail(callId, response)` 回调：
+原生侧通过 `window.Kite.onSuccess(callId, response)` 或 `window.Kite.onFail(callId, response)` 回调：
 
 ```json
 {

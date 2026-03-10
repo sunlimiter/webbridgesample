@@ -44,7 +44,7 @@ app/src/main/
 │       ├── BridgeRequest.kt     # JS → Native request / Native → JS response DTOs
 │       ├── ActionHandler.kt     # Interface all native handlers must implement
 │       ├── ActionDispatcher.kt  # Registry: maps action strings to handlers
-│       ├── KiteJSJsInterface.kt # @JavascriptInterface entry point, coroutine orchestration
+│       ├── KiteJSInterface.kt # @JavascriptInterface entry point, coroutine orchestration
 │       └── GetLocationHandler.kt # Example handler: "getLocation" action
 ```
 
@@ -69,7 +69,7 @@ Call `window.NativeInterface.jsCallAndroidMethod(jsonString)` with the following
 
 ### Android → JS callback
 
-The native side calls back via `window.KiteJS.onSuccess(callId, response)` or `window.KiteJS.onFail(callId, response)`:
+The native side calls back via `window.Kite.onSuccess(callId, response)` or `window.Kite.onFail(callId, response)`:
 
 ```json
 {

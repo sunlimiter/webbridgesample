@@ -79,7 +79,7 @@ class KiteJSInterface(
 
         withContext(Dispatchers.Main) {
             val methodName = if (isSuccess) "onSuccess" else "onFail"
-            val jsCode = "javascript:window.KiteJS.$methodName('$callId', $responseJson);"
+            val jsCode = "javascript:window.Kite.$methodName('$callId', $responseJson);"
             webView.evaluateJavascript(jsCode, null)
         }
     }
