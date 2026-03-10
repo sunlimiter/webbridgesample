@@ -1,17 +1,183 @@
-<!doctype html>
-<html lang="">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" href="./favicon.ico" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no , orientation=portrait"
-    />
-    <title>Vite App</title>
-    <script type="module" crossorigin src="./assets/index-DWRrcY4m.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-CW9GEi2S.css">
-  </head>
-  <body>
-    <div id="app"></div>
-  </body>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WebBridge 原生测试页</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            padding: 20px;
+            background-color: #f7f8fa;
+            color: #333;
+        }
+        h2 { text-align: center; color: #333; }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        button {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            background-color: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:active { background-color: #005BB5; }
+        button.danger { background-color: #FF3B30; }
+        button.danger:active { background-color: #D70015; }
+
+        .console-box {
+            background: #282c34;
+            color: #abb2bf;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 14px;
+            min-height: 100px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .text-success { color: #98c379; }
+        .text-error { color: #e06c75; }
+        .text-info { color: #61afef; }
+    </style>
+</head>
+<body>
+
+<h2>Native Bridge 测试</h2>
+
+<div class="card">
+    <button id="btn-location">测试：获取定位 (getLocation)</button>
+</div>
+
+<div class="card">
+    <h3>实时返回结果：</h3>
+    <div id="log-container" class="console-box">等待操作...</div>
+</div>
+
+<script>
+    // ==========================================
+    // 1. 简易版原生 JS Bridge 实现 (内置于页面)
+    // ==========================================
+    const KiteBridge = (function() {
+        let callIdCounter = 0;
+        const callbackMap = new Map();
+
+        // 工具：解析 JSON
+        const parseJson = (data) => {
+            if (typeof data === 'object' && data !== null) return data;
+            try { return data ? JSON.parse(data) : {}; }
+            catch (e) { return {}; }
+        };
+
+        const kite = {
+            // 核心调用方法
+            nativeCall(action, params, successCall, failCall) {
+                const callId = `callId_${Date.now()}_${callIdCounter++}`;
+                callbackMap.set(callId, { success: successCall, fail: failCall });
+
+                const payloadObj = {
+                    action: action,
+                    params: params || {},
+                    callId: callId
+                };
+
+                const jsonString = JSON.stringify(payloadObj);
+                printLog(`[JS 发送] -> Native:\n${jsonString}`, 'info');
+
+                // 尝试发给 Native
+                try {
+                    if (window.NativeInterface && window.NativeInterface.jsCallAndroidMethod) {
+                        window.NativeInterface.jsCallAndroidMethod(jsonString);
+                    } else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.NativeInterface) {
+                        window.webkit.messageHandlers.NativeInterface.postMessage(jsonString);
+                    } else {
+                        throw new Error('未找到 Native 通道');
+                    }
+                } catch (e) {
+                    printLog(`[发送失败] ${e.message}。将在 1 秒后模拟返回结果...`, 'error');
+                    // 浏览器脱机测试兜底逻辑
+                    setTimeout(() => {
+                        window.Kite.onSuccess(callId, { mock: true, msg: "这是浏览器模拟的数据" });
+                    }, 1000);
+                }
+            },
+
+            // 接收成功回调
+            onSuccess(callId, data) {
+                const parsedData = parseJson(data);
+                printLog(`[Native 成功返回] <- JS:\n${JSON.stringify(parsedData, null, 2)}`, 'success');
+                if (callbackMap.has(callId)) {
+                    callbackMap.get(callId).success(parsedData);
+                    callbackMap.delete(callId);
+                }
+            },
+
+            // 接收失败回调
+            onFail(callId, data) {
+                const parsedData = parseJson(data);
+                printLog(`[Native 失败返回] <- JS:\n${JSON.stringify(parsedData, null, 2)}`, 'error');
+                if (callbackMap.has(callId)) {
+                    callbackMap.get(callId).fail(parsedData);
+                    callbackMap.delete(callId);
+                }
+            }
+        };
+
+        // 挂载到全局，供 Native 执行回调
+        window.Kite = {
+            onSuccess: kite.onSuccess.bind(kite),
+            onFail: kite.onFail.bind(kite)
+        };
+
+        return kite;
+    })();
+
+    // ==========================================
+    // 2. 页面交互日志打印逻辑
+    // ==========================================
+    const logContainer = document.getElementById('log-container');
+    function printLog(text, type = 'info') {
+        const time = new Date().toLocaleTimeString();
+        const span = document.createElement('div');
+        span.className = `text-${type}`;
+        span.innerText = `[${time}] ${text}\n`;
+
+        // 插入到最前面
+        if (logContainer.innerText === '等待操作...') {
+            logContainer.innerHTML = '';
+        }
+        logContainer.prepend(span);
+    }
+
+    // ==========================================
+    // 3. 绑定按钮点击事件，发起调用
+    // ==========================================
+    document.getElementById('btn-location').addEventListener('click', () => {
+        const params = { accuracy: 'high', timeout: 5000 };
+
+        KiteBridge.nativeCall('getLocation', params,
+            (res) => {
+                // 这里的日志已经在 onSuccess 里打印了，这里可以处理具体的业务UI逻辑
+                console.log('前端业务层拿到定位结果:', res);
+            },
+            (err) => {
+                console.error('前端业务层拿到失败结果:', err);
+            }
+        );
+    });
+
+</script>
+</body>
 </html>
